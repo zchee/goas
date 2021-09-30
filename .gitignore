@@ -1,4 +1,5 @@
 /goas
+!goas/
 /babygo
 *.o
 *.bin

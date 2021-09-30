@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"unsafe"
+
+	"github.com/DQNEO/goas/goas"
 )
 
 var oFlag = flag.String("o", "a.out", "output file")
@@ -52,7 +54,7 @@ func (ss *sections) add(s *section) {
 type section struct {
 	name       string
 	index      uint16
-	header     *Elf64_Shdr
+	header     *goas.Elf64_Shdr
 	numZeroPad uintptr
 	zeros      []uint8
 	contents   []uint8
@@ -60,7 +62,7 @@ type section struct {
 
 func buildSectionHeaders(hasRelaText, hasRelaData, hasSymbols bool) []*section {
 	var ss sections = make([]*section, 0, 8)
-	ss.add(&section{header: &Elf64_Shdr{}}) // NULL section
+	ss.add(&section{header: &goas.Elf64_Shdr{}}) // NULL section
 	ss.add(s_text)
 	if hasRelaText {
 		ss.add(s_rela_text)
@@ -88,63 +90,63 @@ func buildSectionHeaders(hasRelaText, hasRelaData, hasSymbols bool) []*section {
 
 var s_text = &section{
 	name: ".text",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_PROGBITS,
-		sh_flags:     0x06, // SHF_ALLOC|SHF_EXECINSTR
-		sh_addr:      0,
-		sh_link:      0,
-		sh_info:      0,
-		sh_addralign: 0x01,
-		sh_entsize:   0,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_PROGBITS,
+		Sh_flags:     0x06, // SHF_ALLOC|SHF_EXECINSTR
+		Sh_addr:      0,
+		Sh_link:      0,
+		Sh_info:      0,
+		Sh_addralign: 0x01,
+		Sh_entsize:   0,
 	},
 }
 
 var s_rela_text = &section{
 	name: ".rela.text",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_RELA,
-		sh_flags:     0x40, // * ??
-		sh_link:      0x00, // The section header index of the associated symbol table
-		sh_info:      0x01,
-		sh_addralign: 0x08,
-		sh_entsize:   0x18,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_RELA,
+		Sh_flags:     0x40, // * ??
+		Sh_link:      0x00, // The section header index of the associated symbol table
+		Sh_info:      0x01,
+		Sh_addralign: 0x08,
+		Sh_entsize:   0x18,
 	},
 }
 
 var s_rela_data = &section{
 	name: ".rela.data",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_RELA,
-		sh_flags:     0x40, // I ??
-		sh_info:      0x02, // section idx of .data
-		sh_addralign: 0x08,
-		sh_entsize:   0x18,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_RELA,
+		Sh_flags:     0x40, // I ??
+		Sh_info:      0x02, // section idx of .data
+		Sh_addralign: 0x08,
+		Sh_entsize:   0x18,
 	},
 }
 
 var s_data = &section{
 	name: ".data",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_PROGBITS,
-		sh_flags:     0x03, // SHF_WRITE|SHF_ALLOC
-		sh_addr:      0,
-		sh_link:      0,
-		sh_info:      0,
-		sh_addralign: 0x01,
-		sh_entsize:   0,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_PROGBITS,
+		Sh_flags:     0x03, // SHF_WRITE|SHF_ALLOC
+		Sh_addr:      0,
+		Sh_link:      0,
+		Sh_info:      0,
+		Sh_addralign: 0x01,
+		Sh_entsize:   0,
 	},
 }
 
 var s_bss = &section{
 	name: ".bss",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_NOBITS,
-		sh_flags:     0x03, // SHF_WRITE|SHF_ALLOC
-		sh_addr:      0,
-		sh_link:      0,
-		sh_info:      0,
-		sh_addralign: 0x01,
-		sh_entsize:   0,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_NOBITS,
+		Sh_flags:     0x03, // SHF_WRITE|SHF_ALLOC
+		Sh_addr:      0,
+		Sh_link:      0,
+		Sh_info:      0,
+		Sh_addralign: 0x01,
+		Sh_entsize:   0,
 	},
 }
 
@@ -152,26 +154,26 @@ var s_bss = &section{
 //  SHT_SYMTAB (symbol table)
 var s_symtab = &section{
 	name: ".symtab",
-	header: &Elf64_Shdr{
-		sh_type:  SHT_SYMTAB, // SHT_SYMTAB
-		sh_flags: 0,
-		sh_addr:  0,
-		//	sh_link:      0x05, // section index of .strtab ?
-		sh_addralign: 0x08,
-		sh_entsize:   0x18,
+	header: &goas.Elf64_Shdr{
+		Sh_type:  goas.SHT_SYMTAB, // SHT_SYMTAB
+		Sh_flags: 0,
+		Sh_addr:  0,
+		//	Sh_link:      0x05, // section index of .strtab ?
+		Sh_addralign: 0x08,
+		Sh_entsize:   0x18,
 	},
 }
 
 var s_shstrtab = &section{
 	name: ".shstrtab",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_STRTAB,
-		sh_flags:     0,
-		sh_addr:      0,
-		sh_link:      0,
-		sh_info:      0,
-		sh_addralign: 0x01,
-		sh_entsize:   0,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_STRTAB,
+		Sh_flags:     0,
+		Sh_addr:      0,
+		Sh_link:      0,
+		Sh_info:      0,
+		Sh_addralign: 0x01,
+		Sh_entsize:   0,
 	},
 }
 
@@ -185,20 +187,20 @@ var s_shstrtab = &section{
 // This section is of type SHT_STRTAB.
 var s_strtab = &section{
 	name: ".strtab",
-	header: &Elf64_Shdr{
-		sh_type:      SHT_STRTAB,
-		sh_flags:     0,
-		sh_addr:      0,
-		sh_link:      0,
-		sh_info:      0,
-		sh_addralign: 0x01,
-		sh_entsize:   0,
+	header: &goas.Elf64_Shdr{
+		Sh_type:      goas.SHT_STRTAB,
+		Sh_flags:     0,
+		Sh_addr:      0,
+		Sh_link:      0,
+		Sh_info:      0,
+		Sh_addralign: 0x01,
+		Sh_entsize:   0,
 	},
 }
 
 func calcOffsetOfSection(s *section, prev *section) {
-	tentative_offset := prev.header.sh_offset + prev.header.sh_size
-	var align = s.header.sh_addralign
+	tentative_offset := prev.header.Sh_offset + prev.header.Sh_size
+	var align = s.header.Sh_addralign
 	if align == 0 || align == 1 {
 		s.numZeroPad = 0
 	} else {
@@ -209,8 +211,8 @@ func calcOffsetOfSection(s *section, prev *section) {
 			s.numZeroPad = align - mod
 		}
 	}
-	s.header.sh_offset = tentative_offset + s.numZeroPad
-	s.header.sh_size = uintptr(len(s.contents))
+	s.header.Sh_offset = tentative_offset + s.numZeroPad
+	s.header.Sh_size = uintptr(len(s.contents))
 }
 
 func makeStrTab(symbols []string) []byte {
@@ -269,35 +271,26 @@ func resolveShNames(shstrtab_contents []byte, ss []*section) {
 		if idx <= 0 {
 			panic(s.name + " is not found in .strtab contents")
 		}
-		s.header.sh_name = uint32(idx)
+		s.header.Sh_name = uint32(idx)
 	}
 }
 
-type symbolDefinition struct {
-	name    string
-	section string
-	address uintptr
-	instr   *Instruction
-}
-
-var definedSymbols = make(map[string]*symbolDefinition)
-
 const STT_SECTION = 0x03
 
-func isDataSymbolUsed(definedSymbols map[string]*symbolDefinition, relaTextUsers []*relaTextUser, relaDataUsers []*relaDataUser) bool {
-	for _, rel :=  range relaTextUsers {
-		symdef, ok := definedSymbols[rel.uses]
+func isDataSymbolUsed(definedSymbols map[string]*goas.SymbolDefinition, relaTextUsers []*goas.RelaTextUser, relaDataUsers []*goas.RelaDataUser) bool {
+	for _, rel := range relaTextUsers {
+		symdef, ok := definedSymbols[rel.Uses]
 		if ok {
-			if symdef.section == ".data" {
+			if symdef.Section == ".data" {
 				return true
 			}
 		}
 	}
 
-	for _, rel :=  range relaDataUsers {
-		symdef, ok := definedSymbols[rel.uses]
+	for _, rel := range relaDataUsers {
+		symdef, ok := definedSymbols[rel.Uses]
 		if ok {
-			if symdef.section == ".data" {
+			if symdef.Section == ".data" {
 				return true
 			}
 		}
@@ -308,19 +301,19 @@ func isDataSymbolUsed(definedSymbols map[string]*symbolDefinition, relaTextUsers
 func buildSymbolTable(addData bool, globalSymbols map[string]bool, symbolsInLexicalOrder []string) (uint32, []uint8, map[string]int) {
 	var symbolIndex = make(map[string]int)
 
-	var symbolTable = []*Elf64_Sym{
-		&Elf64_Sym{}, // NULL entry
+	var symbolTable = []*goas.Elf64_Sym{
+		&goas.Elf64_Sym{}, // NULL entry
 	}
 
 	if addData {
 		symbolIndex[".data"] = len(symbolTable)
-		symbolTable = append(symbolTable, &Elf64_Sym{
-			st_name:  0,
-			st_info:  STT_SECTION,
-			st_other: 0,
-			st_shndx: uint16(s_data.index),
-			st_value: 0,
-			st_size:  0,
+		symbolTable = append(symbolTable, &goas.Elf64_Sym{
+			St_name:  0,
+			St_info:  STT_SECTION,
+			St_other: 0,
+			St_shndx: uint16(s_data.index),
+			St_value: 0,
+			St_size:  0,
 		})
 	}
 
@@ -337,7 +330,7 @@ func buildSymbolTable(addData bool, globalSymbols map[string]bool, symbolsInLexi
 			continue
 		}
 		isGlobal := globalSymbols[sym]
-		_, isDefined := definedSymbols[sym]
+		_, isDefined := goas.DefinedSymbols[sym]
 		if !isDefined {
 			isGlobal = true
 		}
@@ -365,24 +358,23 @@ func buildSymbolTable(addData bool, globalSymbols map[string]bool, symbolsInLexi
 
 	for _, symname := range allSymbolsForElf {
 		isGlobal := globalSymbols[symname]
-		sym, isDefined := definedSymbols[symname]
+		sym, isDefined := goas.DefinedSymbols[symname]
 		var addr uintptr
 		var shndx uint16
 		if isDefined {
-			switch sym.section {
+			switch sym.Section {
 			case ".text":
 				shndx = s_text.index
-				addr = sym.instr.addr
+				addr = sym.Instr.Addr
 			case ".data":
 				shndx = s_data.index
-				addr = sym.address
+				addr = sym.Address
 			default:
 				panic("TBI")
 			}
 		} else {
 			isGlobal = true
 		}
-
 
 		name_offset := bytes.Index(s_strtab.contents, append([]byte(symname), 0x0))
 		if name_offset < 0 {
@@ -392,12 +384,12 @@ func buildSymbolTable(addData bool, globalSymbols map[string]bool, symbolsInLexi
 		if isGlobal {
 			st_info = 0x10 // GLOBAL ?
 		}
-		e := &Elf64_Sym{
-			st_name:  uint32(name_offset),
-			st_info:  st_info,
-			st_other: 0,
-			st_shndx: shndx,
-			st_value: addr,
+		e := &goas.Elf64_Sym{
+			St_name:  uint32(name_offset),
+			St_info:  st_info,
+			St_other: 0,
+			St_shndx: shndx,
+			St_value: addr,
 		}
 		index := len(symbolTable)
 		symbolTable = append(symbolTable, e)
@@ -420,72 +412,49 @@ func buildSymbolTable(addData bool, globalSymbols map[string]bool, symbolsInLexi
 
 	var contents []uint8
 	for _, entry := range symbolTable {
-		buf := ((*[unsafe.Sizeof(Elf64_Sym{})]byte)(unsafe.Pointer(entry)))[:]
+		buf := ((*[unsafe.Sizeof(goas.Elf64_Sym{})]byte)(unsafe.Pointer(entry)))[:]
 		contents = append(contents, buf...)
 	}
 
 	return sh_info, contents, symbolIndex
 }
 
-type relaDataUser struct {
-	addr uintptr
-	uses string
-}
+var first *goas.Instruction
 
-var relaDataUsers []*relaDataUser
-
-type relaTextUser struct {
-	instr  *Instruction
-	offset uintptr
-	toJump bool
-	uses   string
-	adjust int64
-}
-
-var relaTextUsers []*relaTextUser
-
-func assert(bol bool, errorMsg string) {
-	if !bol {
-		panic("assert failed: " + errorMsg)
-	}
-}
-
-var first *Instruction
-
-func resolveVariableLengthInstrs(instrs []*Instruction) []*Instruction {
-	var todos []*Instruction
+func resolveVariableLengthInstrs(instrs []*goas.Instruction) []*goas.Instruction {
+	var todos []*goas.Instruction
 	for _, vr := range instrs {
-		sym, ok := definedSymbols[vr.varcode.trgtSymbol]
+		sym, ok := goas.DefinedSymbols[vr.Varcode.TrgtSymbol]
 		if !ok {
 			continue
 		}
-		diff, min, max, isLenDecided := calcDistance(vr, sym)
+		diff, min, max, isLenDecided := goas.CalcDistance(vr, sym)
 		if isLenDecided {
-			if isInInt8Range(diff) {
+			if goas.IsInInt8Range(diff) {
 				// rel8
-				vr.code = vr.varcode.rel8Code
-				vr.code[vr.varcode.rel8Offset] = uint8(diff)
+				vr.Code = vr.Varcode.Rel8Code
+				vr.Code[vr.Varcode.Rel8Offset] = uint8(diff)
 			} else {
 				// rel32
 				diffInt32 := int32(diff)
 				var buf *[4]byte = (*[4]byte)(unsafe.Pointer(&diffInt32))
-				code, offset := vr.varcode.rel32Code, vr.varcode.rel32Offset
+				code, offset := vr.Varcode.Rel32Code, vr.Varcode.Rel32Offset
 				code[offset] = buf[0]
 				code[offset+1] = buf[1]
 				code[offset+2] = buf[2]
 				code[offset+3] = buf[3]
-				vr.code = code
+				vr.Code = code
 			}
-			vr.isLenDecided = true
+			vr.IsLenDecided = true
 		} else {
-			if isInInt8Range(max) {
-				vr.isLenDecided = true
-				vr.varcode.rel32Code = nil
-				vr.code = vr.varcode.rel8Code
-			} else if !isInInt8Range(min) {
-				vr.isLenDecided = true
-				vr.varcode.rel8Code = nil
-				vr.code = vr.varcode.rel32Code
+			if goas.IsInInt8Range(max) {
+				vr.IsLenDecided = true
+				vr.Varcode.Rel32Code = nil
+				vr.Code = vr.Varcode.Rel8Code
+			} else if !goas.IsInInt8Range(min) {
+				vr.IsLenDecided = true
+				vr.Varcode.Rel8Code = nil
+				vr.Code = vr.Varcode.Rel32Code
 			}
 			todos = append(todos, vr)
 		}
@@ -494,50 +463,50 @@ func resolveVariableLengthInstrs(instrs []*Instruction) []*Instruction {
 	return todos
 }
 
-func encodeAllText(ss []*Stmt) []byte {
-	var insts []*Instruction
+func encodeAllText(ss []*goas.Stmt) []byte {
+	var insts []*goas.Instruction
 	var index int
-	var prev *Instruction
+	var prev *goas.Instruction
 	for _, s := range ss {
-		if s.labelSymbol == "" && s.keySymbol == "" {
+		if s.LabelSymbol == "" && s.KeySymbol == "" {
 			continue
 		}
-		instr := encode(s)
-		if s.labelSymbol != "" {
-			definedSymbols[s.labelSymbol].instr = instr
+		instr := goas.Encode(s)
+		if s.LabelSymbol != "" {
+			goas.DefinedSymbols[s.LabelSymbol].Instr = instr
 		}
 		insts = append(insts, instr)
-		instr.index = index
+		instr.Index = index
 		index++
 		if first == nil {
 			first = instr
 		} else {
-			prev.next = instr
+			prev.Next = instr
 		}
 		prev = instr
 	}
 
 	// Optimize instructions length
-	for len(variableInstrs) > 0 {
-		variableInstrs = resolveVariableLengthInstrs(variableInstrs)
+	for len(goas.VariableInstrs) > 0 {
+		goas.VariableInstrs = resolveVariableLengthInstrs(goas.VariableInstrs)
 	}
 
 	var allText []byte
 	var textAddr uintptr
-	for instr := first; instr != nil; instr = instr.next {
-		instr.addr = textAddr
-		allText = append(allText, instr.code...)
-		textAddr += uintptr(len(instr.code))
+	for instr := first; instr != nil; instr = instr.Next {
+		instr.Addr = textAddr
+		allText = append(allText, instr.Code...)
+		textAddr += uintptr(len(instr.Code))
 	}
 
 	// Resolve call targets
-	for _, call := range callTargets {
-		callee, ok := definedSymbols[call.trgtSymbol]
+	for _, call := range goas.CallTargets {
+		callee, ok := goas.DefinedSymbols[call.TrgtSymbol]
 		if !ok {
 			continue
 		}
-		diff := callee.instr.addr - call.caller.next.addr
-		placeToEmbed := call.caller.addr + call.offset
+		diff := callee.Instr.Addr - call.Caller.Next.Addr
+		placeToEmbed := call.Caller.Addr + call.Offset
 		diffInt32 := int32(diff)
 		var buf *[4]byte = (*[4]byte)(unsafe.Pointer(&diffInt32))
 		allText[placeToEmbed] = buf[0]
@@ -548,11 +517,11 @@ func encodeAllText(ss []*Stmt) []byte {
 	return allText
 }
 
-func encodeAllData(ss []*Stmt) []byte {
+func encodeAllData(ss []*goas.Stmt) []byte {
 	var dataAddr uintptr
 	var allData []byte
 	for _, s := range ss {
-		buf := encodeData(s, dataAddr)
+		buf := goas.EncodeData(s, dataAddr)
 		dataAddr += uintptr(len(buf))
 		allData = append(allData, buf...)
 	}
@@ -577,23 +546,23 @@ func main() {
 		panic(err)
 	}
 
-	stmts, symbolsInLexicalOrder := ParseFiles(inFiles)
+	stmts, symbolsInLexicalOrder := goas.ParseFiles(inFiles)
 
-	var textStmts []*Stmt
-	var dataStmts []*Stmt
+	var textStmts []*goas.Stmt
+	var dataStmts []*goas.Stmt
 
 	var globalSymbols = make(map[string]bool)
 	var currentSection = ".text"
 	for _, s := range stmts {
 
-		if s.labelSymbol != "" {
-			definedSymbols[s.labelSymbol] = &symbolDefinition{
-				name:    s.labelSymbol,
-				section: currentSection,
+		if s.LabelSymbol != "" {
+			goas.DefinedSymbols[s.LabelSymbol] = &goas.SymbolDefinition{
+				Name:    s.LabelSymbol,
+				Section: currentSection,
 			}
 		}
 
-		switch s.keySymbol {
+		switch s.KeySymbol {
 		case ".data":
 			currentSection = ".data"
 			continue
@@ -601,7 +570,7 @@ func main() {
 			currentSection = ".text"
 			continue
 		case ".global":
-			globalSymbols[s.operands[0].(*symbolExpr).name] = true
+			globalSymbols[s.Operands[0].(*goas.SymbolExpr).Name] = true
 			continue
 		}
 
@@ -613,34 +582,33 @@ func main() {
 		}
 	}
 
-
 	s_text.contents = encodeAllText(textStmts)
 	s_data.contents = encodeAllData(dataStmts)
 
-	hasRelaText := len(relaTextUsers) > 0
-	hasRelaData := len(relaDataUsers) > 0
-	hasSymbols := len(definedSymbols) > 0
+	hasRelaText := len(goas.RelaTextUsers) > 0
+	hasRelaData := len(goas.RelaDataUsers) > 0
+	hasSymbols := len(goas.DefinedSymbols) > 0
 
 	sectionHeaders := buildSectionHeaders(hasRelaText, hasRelaData, hasSymbols)
 
 	if hasSymbols {
-		s_symtab.header.sh_link = uint32(s_strtab.index) // @TODO confirm the reason to do this
+		s_symtab.header.Sh_link = uint32(s_strtab.index) // @TODO confirm the reason to do this
 
 		if hasRelaText {
-			s_rela_text.header.sh_link = uint32(s_symtab.index)
+			s_rela_text.header.Sh_link = uint32(s_symtab.index)
 		}
 
 		if hasRelaData {
-			s_rela_data.header.sh_link = uint32(s_symtab.index)
-			s_rela_data.header.sh_info = uint32(s_data.index)
+			s_rela_data.header.Sh_link = uint32(s_symtab.index)
+			s_rela_data.header.Sh_info = uint32(s_data.index)
 		}
 	}
 
 	var symbolIndex map[string]int
 
-	if len(definedSymbols) > 0 {
-		dataSymbolUsed := isDataSymbolUsed(definedSymbols, relaTextUsers, relaDataUsers)
-		s_symtab.header.sh_info , s_symtab.contents, symbolIndex = buildSymbolTable(dataSymbolUsed, globalSymbols, symbolsInLexicalOrder)
+	if len(goas.DefinedSymbols) > 0 {
+		dataSymbolUsed := isDataSymbolUsed(goas.DefinedSymbols, goas.RelaTextUsers, goas.RelaDataUsers)
+		s_symtab.header.Sh_info, s_symtab.contents, symbolIndex = buildSymbolTable(dataSymbolUsed, globalSymbols, symbolsInLexicalOrder)
 	}
 
 	debugf("[main] building sections ...\n")
@@ -648,76 +616,76 @@ func main() {
 	s_shstrtab.contents = makeShStrTab(sectionNames)
 	resolveShNames(s_shstrtab.contents, sectionHeaders[1:])
 
-	s_rela_text.contents = buildRelaTextBody(relaTextUsers, symbolIndex)
-	s_rela_data.contents = buildRelaDataBody(relaDataUsers)
+	s_rela_text.contents = buildRelaTextBody(goas.RelaTextUsers, symbolIndex)
+	s_rela_data.contents = buildRelaDataBody(goas.RelaDataUsers)
 
 	sectionInBodyOrder := sortSectionsForBody(hasRelaText, hasRelaData, hasSymbols)
-	assert(len(sectionInBodyOrder) == len(sectionHeaders)-1, "sections len unmatch")
+	goas.Assert(len(sectionInBodyOrder) == len(sectionHeaders)-1, "sections len unmatch")
 	debugf("[main] writing ELF file ...\n")
 	elfFile := prepareElfFile(sectionInBodyOrder, sectionHeaders)
-	elfFile.writeTo(w)
+	elfFile.WriteTo(w)
 }
 
-func buildRelaTextBody(relaTextUsers []*relaTextUser, symbolIndex map[string]int) []byte {
+func buildRelaTextBody(relaTextUsers []*goas.RelaTextUser, symbolIndex map[string]int) []byte {
 	var contents []byte
 
 	for _, ru := range relaTextUsers {
-		sym, defined := definedSymbols[ru.uses]
+		sym, defined := goas.DefinedSymbols[ru.Uses]
 		var addr int64
 		if defined {
 			// skip symbols that belong to the same section
-			if sym.section == ".text" {
+			if sym.Section == ".text" {
 				continue
 			}
-			addr = int64(sym.address)
+			addr = int64(sym.Address)
 		}
 
 		var typ uint64
-		if ru.toJump {
-			typ = R_X86_64_PLT32
+		if ru.ToJump {
+			typ = goas.R_X86_64_PLT32
 		} else {
-			typ = R_X86_64_PC32
+			typ = goas.R_X86_64_PC32
 		}
 
 		var symIdx int
-		if defined && sym.section == ".data" {
+		if defined && sym.Section == ".data" {
 			symIdx = symbolIndex[".data"]
 		} else {
-			symIdx = symbolIndex[ru.uses]
+			symIdx = symbolIndex[ru.Uses]
 		}
 
-		rela := &Elf64_Rela{
-			r_offset: ru.instr.addr + ru.offset,
-			r_info:   uint64(symIdx)<<32 + typ,
-			r_addend: addr + ru.adjust - 4,
+		rela := &goas.Elf64_Rela{
+			R_offset: ru.Instr.Addr + ru.Offset,
+			R_info:   uint64(symIdx)<<32 + typ,
+			R_addend: addr + ru.Adjust - 4,
 		}
-		p := (*[unsafe.Sizeof(Elf64_Rela{})]byte)(unsafe.Pointer(rela))[:]
+		p := (*[unsafe.Sizeof(goas.Elf64_Rela{})]byte)(unsafe.Pointer(rela))[:]
 		contents = append(contents, p...)
 	}
 	return contents
 }
 
-func buildRelaDataBody(relaDataUsers []*relaDataUser) []byte {
+func buildRelaDataBody(relaDataUsers []*goas.RelaDataUser) []byte {
 	var contents []byte
 	for _, ru := range relaDataUsers {
-		sym, ok := definedSymbols[ru.uses]
+		sym, ok := goas.DefinedSymbols[ru.Uses]
 		if !ok {
 			panic("label not found")
 		}
 
 		var addr uintptr
-		if sym.section == ".text" {
-			addr = sym.instr.addr
+		if sym.Section == ".text" {
+			addr = sym.Instr.Addr
 		} else {
-			addr = sym.address
+			addr = sym.Address
 		}
 
-		rela := &Elf64_Rela{
-			r_offset: ru.addr,
-			r_info:   0x0100000001,
-			r_addend: int64(addr),
+		rela := &goas.Elf64_Rela{
+			R_offset: ru.Addr,
+			R_info:   0x0100000001,
+			R_addend: int64(addr),
 		}
-		p := (*[unsafe.Sizeof(Elf64_Rela{})]byte)(unsafe.Pointer(rela))[:]
+		p := (*[unsafe.Sizeof(goas.Elf64_Rela{})]byte)(unsafe.Pointer(rela))[:]
 		contents = append(contents, p...)
 	}
 	return contents
@@ -725,17 +693,17 @@ func buildRelaDataBody(relaDataUsers []*relaDataUser) []byte {
 
 func determineSectionOffsets(sectionBodies []*section) {
 	firstSection := sectionBodies[0]
-	firstSection.header.sh_offset = unsafe.Sizeof(Elf64_Ehdr{})
-	firstSection.header.sh_size = uintptr(len(firstSection.contents))
+	firstSection.header.Sh_offset = unsafe.Sizeof(goas.Elf64_Ehdr{})
+	firstSection.header.Sh_size = uintptr(len(firstSection.contents))
 	for i := 1; i < len(sectionBodies); i++ {
 		calcOffsetOfSection(
 			sectionBodies[i], sectionBodies[i-1])
 	}
 }
 
-func calcEShoff(last *Elf64_Shdr) (uintptr, uintptr) {
+func calcEShoff(last *goas.Elf64_Shdr) (uintptr, uintptr) {
 
-	endOfLastSection := last.sh_offset + last.sh_size
+	endOfLastSection := last.Sh_offset + last.Sh_size
 
 	var paddingBeforeSHT uintptr
 	// align shoff so that e_shoff % 8 be zero. (This is not required actually. Just following gcc's practice)
@@ -747,7 +715,31 @@ func calcEShoff(last *Elf64_Shdr) (uintptr, uintptr) {
 	return paddingBeforeSHT, eshoff
 }
 
-func prepareElfFile(sectionBodies []*section, sectionHeaders []*section) *ElfFile {
+// static data for ELF header.
+// e_shoff, e_shnum, and e_shstrndx will be set later dynamically.
+var elfHeader = &goas.Elf64_Ehdr{
+	E_ident: [goas.EI_NIDENT]uint8{
+		0x7f, 0x45, 0x4c, 0x46, // 0x7F followed by "ELF"(45 4c 46) in ASCII;
+		0x02,                                     // EI_CLASS:2=64-bit
+		0x01,                                     // EI_DATA:1=little endian
+		0x01,                                     // EI_VERSION:1=the original and current version of ELF.
+		0x00,                                     // EI_OSABI: 0=System V
+		0x00,                                     // EI_ABIVERSION:
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // EI_PAD: always zero.
+	},
+	E_type:      1,    // ET_REL
+	E_machine:   0x3e, // AMD x86-64
+	E_version:   1,
+	E_entry:     0,
+	E_phoff:     0,
+	E_flags:     0,
+	E_ehsize:    uint16(unsafe.Sizeof(goas.Elf64_Ehdr{})), // 64
+	E_phentsize: 0,
+	E_phnum:     0,
+	E_shentsize: uint16(unsafe.Sizeof(goas.Elf64_Shdr{})), // 64
+}
+
+func prepareElfFile(sectionBodies []*section, sectionHeaders []*section) *goas.ElfFile {
 
 	// Calculates offset and zero padding
 	determineSectionOffsets(sectionBodies)
@@ -755,35 +747,35 @@ func prepareElfFile(sectionBodies []*section, sectionHeaders []*section) *ElfFil
 	lastSectionHeader := sectionHeaders[len(sectionHeaders)-1].header
 	paddingBeforeSHT, eshoff := calcEShoff(lastSectionHeader)
 
-	elfHeader.e_shoff = eshoff
-	elfHeader.e_shnum = uint16(len(sectionHeaders))
-	elfHeader.e_shstrndx = s_shstrtab.index
+	elfHeader.E_shoff = eshoff
+	elfHeader.E_shnum = uint16(len(sectionHeaders))
+	elfHeader.E_shstrndx = s_shstrtab.index
 
 	// adjust zero padding before each section
-	var sbs []*ElfSectionBodies
+	var sbs []*goas.ElfSectionBodies
 	for _, sect := range sectionBodies {
 		// Some sections may not have any contents
 		if sect.contents != nil {
-			sc := &ElfSectionBodies{
-				bodies: sect.contents,
+			sc := &goas.ElfSectionBodies{
+				Bodies: sect.contents,
 			}
 			if sect.numZeroPad > 0 {
 				// pad zeros when required
-				sc.zeros = make([]uint8, sect.numZeroPad)
+				sc.Zeros = make([]uint8, sect.numZeroPad)
 			}
 			sbs = append(sbs, sc)
 		}
 	}
 
-	var sht []*Elf64_Shdr
+	var sht []*goas.Elf64_Shdr
 	for _, s := range sectionHeaders {
 		sht = append(sht, s.header)
 	}
 
-	return &ElfFile{
-		header:         elfHeader,
-		sectionBodies:  sbs,
-		zeroPadding:    make([]uint8, paddingBeforeSHT),
-		sectionHeaders: sht,
+	return &goas.ElfFile{
+		Header:         elfHeader,
+		SectionBodies:  sbs,
+		ZeroPadding:    make([]uint8, paddingBeforeSHT),
+		SectionHeaders: sht,
 	}
 }

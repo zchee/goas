@@ -1,4 +1,4 @@
-package main
+package goas
 
 import (
 	"fmt"
@@ -141,7 +141,7 @@ func (p *parser) readStringLiteral() *strLit {
 		switch ch {
 		case '"':
 			p.idx++
-			return &strLit{val:string(buf)}
+			return &strLit{val: string(buf)}
 		case '\\':
 			p.expect('\\')
 			ch := p.peekCh()
@@ -251,8 +251,8 @@ func (p *parser) parseOperand() Operand {
 			// indirection e.g. 24(%rbp)
 			regi := p.readParenthRegister()
 			return &indirection{
-				expr: &symbolExpr{
-					name: symbol,
+				expr: &SymbolExpr{
+					Name: symbol,
 				},
 				regi: regi,
 			}
@@ -265,7 +265,7 @@ func (p *parser) parseOperand() Operand {
 				return &indirection{
 					expr: &binaryExpr{
 						op:    "+",
-						left:  &symbolExpr{name: symbol},
+						left:  &SymbolExpr{Name: symbol},
 						right: e,
 					},
 					regi: regi,
@@ -275,7 +275,7 @@ func (p *parser) parseOperand() Operand {
 			}
 		default:
 			// just a symbol
-			return &symbolExpr{name: symbol}
+			return &SymbolExpr{Name: symbol}
 		}
 	case ch == '\'':
 		return p.readCharLiteral()
@@ -350,7 +350,7 @@ type parser struct {
 	lineno int
 	source []byte
 	idx    int
-	sc *symbolCollection
+	sc     *symbolCollection
 }
 
 // indirection | symbolExpr | immediate | register | charLit | strLit
@@ -388,8 +388,8 @@ type immediate struct {
 }
 
 // "foo" in ".quad foo" or "foo(%rip)"
-type symbolExpr struct {
-	name string
+type SymbolExpr struct {
+	Name string
 }
 
 type expr interface{}
@@ -401,12 +401,12 @@ type binaryExpr struct {
 }
 
 type Stmt struct {
-	filePath    *string
-	lineno      int
-	source      string // for debug output
-	labelSymbol string
-	keySymbol   string
-	operands    []Operand
+	FilePath    *string
+	Lineno      int
+	Source      string // for debug output
+	LabelSymbol string
+	KeySymbol   string
+	Operands    []Operand
 }
 
 func (p *parser) atEOL() bool {
@@ -458,8 +458,8 @@ func (p *parser) consumeEOL() {
 // Whitespace before a label or after a colon is permitted, but you may not have whitespace between a label’s symbol and its colon. See Labels.
 func (p *parser) parseStmt() *Stmt {
 	var stmt = &Stmt{
-		filePath: &p.path,
-		lineno:   p.lineno,
+		FilePath: &p.path,
+		Lineno:   p.lineno,
 	}
 	p.skipWhitespaces()
 	if p.atEOL() {
@@ -476,7 +476,7 @@ func (p *parser) parseStmt() *Stmt {
 
 	if p.peekCh() == ':' {
 		// this symbol is a label
-		stmt.labelSymbol = symbol
+		stmt.LabelSymbol = symbol
 		p.collectAppearedSymbols(symbol)
 		p.skipWhitespaces()
 		if p.atEOL() {
@@ -493,7 +493,7 @@ func (p *parser) parseStmt() *Stmt {
 		// this symbol is the key symbol in this statement
 		keySymbol = symbol
 	}
-	stmt.keySymbol = keySymbol
+	stmt.KeySymbol = keySymbol
 
 	p.skipWhitespaces()
 	if p.atEOL() {
@@ -502,7 +502,7 @@ func (p *parser) parseStmt() *Stmt {
 	}
 
 	operands := p.parseOperands(keySymbol)
-	stmt.operands = operands
+	stmt.Operands = operands
 	p.consumeEOL()
 	return stmt
 }
@@ -513,7 +513,7 @@ func (p *parser) parse() []*Stmt {
 		idxBegin := p.idx
 		s := p.parseStmt()
 		idxEnd := p.idx - 1
-		s.source = string(p.source[idxBegin:idxEnd])
+		s.Source = string(p.source[idxBegin:idxEnd])
 		stmts = append(stmts, s)
 	}
 	return stmts
@@ -542,7 +542,7 @@ func ParseFile(path string, sc *symbolCollection) []*Stmt {
 		lineno: 1,
 		source: src,
 		idx:    0,
-		sc:sc,
+		sc:     sc,
 	}
 	stmts := p.parse()
 	return stmts

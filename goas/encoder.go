@@ -1,5 +1,5 @@
 // Encode assembly statements into machine code
-package main
+package goas
 
 import (
 	"fmt"
@@ -105,10 +105,10 @@ func composeSIB(scale byte, index byte, base byte) byte {
 	return scale<<6 + index<<3 + base
 }
 
-var variableInstrs []*Instruction
+var VariableInstrs []*Instruction
 
-func isInInt8Range(n int) bool {
-	return -128 <= n && n<= 127
+func IsInInt8Range(n int) bool {
+	return -128 <= n && n <= 127
 }
 
 // 3.1.1.3 Instruction Column in the Opcode Summary Table
@@ -122,60 +122,60 @@ func isInInt8Range(n int) bool {
 // with an operand-size attribute of 32 bits.
 //
 type variableCode struct {
-	trgtSymbol  string
-	rel8Code    []byte
-	rel8Offset  uintptr
-	rel32Code   []byte
-	rel32Offset uintptr
+	TrgtSymbol  string
+	Rel8Code    []byte
+	Rel8Offset  uintptr
+	Rel32Code   []byte
+	Rel32Offset uintptr
 }
 
 type Instruction struct {
-	addr         uintptr
+	Addr         uintptr
 	s            *Stmt
-	index        int
-	code         []byte // fixed length code
-	varcode      *variableCode
-	isLenDecided bool
-	next         *Instruction
+	Index        int
+	Code         []byte // fixed length code
+	Varcode      *variableCode
+	IsLenDecided bool
+	Next         *Instruction
 }
 
-var callTargets []*callTarget
+var CallTargets []*CallTarget
 
-type callTarget struct {
-	trgtSymbol string
-	caller     *Instruction
-	offset     uintptr
-	width      int // 1 or 4 or 8
+type CallTarget struct {
+	TrgtSymbol string
+	Caller     *Instruction
+	Offset     uintptr
+	Width      int // 1 or 4 or 8
 }
 
 func registerCallTarget(caller *Instruction, trgtSymbol string, offset uintptr, width int) {
-	callTargets = append(callTargets, &callTarget{
-		trgtSymbol: trgtSymbol,
-		caller:     caller,
-		offset:     offset,
-		width:      width,
+	CallTargets = append(CallTargets, &CallTarget{
+		TrgtSymbol: trgtSymbol,
+		Caller:     caller,
+		Offset:     offset,
+		Width:      width,
 	})
 }
 
-func calcDistance(userInstr *Instruction, symdef *symbolDefinition) (int, int, int, bool) {
+func CalcDistance(userInstr *Instruction, symdef *SymbolDefinition) (int, int, int, bool) {
 	var from, to *Instruction
-	forward := userInstr.index <= symdef.instr.index
+	forward := userInstr.Index <= symdef.Instr.Index
 	if forward {
-		from, to = userInstr.next, symdef.instr
+		from, to = userInstr.Next, symdef.Instr
 	} else {
-		from, to = symdef.instr, userInstr.next
+		from, to = symdef.Instr, userInstr.Next
 	}
 	var hasVariableLength bool
 	var diff, min, max int
-	for instr := from; instr != to; instr = instr.next {
-		if !instr.isLenDecided {
+	for instr := from; instr != to; instr = instr.Next {
+		if !instr.IsLenDecided {
 			hasVariableLength = true
-			lenShort, lenLarge := len(instr.varcode.rel8Code), len(instr.varcode.rel32Code)
+			lenShort, lenLarge := len(instr.Varcode.Rel8Code), len(instr.Varcode.Rel32Code)
 			min += lenShort
 			max += lenLarge
 			diff += lenLarge // because instr.code is nil in this case
 		} else {
-			length := len(instr.code)
+			length := len(instr.Code)
 			diff += length
 			min += length
 			max += length
@@ -189,12 +189,29 @@ func calcDistance(userInstr *Instruction, symdef *symbolDefinition) (int, int, i
 	return diff, min, max, !hasVariableLength
 }
 
-func encode(s *Stmt) *Instruction {
+type RelaDataUser struct {
+	Addr uintptr
+	Uses string
+}
+
+var RelaDataUsers []*RelaDataUser
+
+type RelaTextUser struct {
+	Instr  *Instruction
+	Offset uintptr
+	ToJump bool
+	Uses   string
+	Adjust int64
+}
+
+var RelaTextUsers []*RelaTextUser
+
+func Encode(s *Stmt) *Instruction {
 	defer func() {
 		if x := recover(); x != nil {
 			panic(fmt.Sprintf("%s\n[encoder] %s at %s:%d\n\necho '%s' |./encode as",
 				x,
-				s.source, *s.filePath, s.lineno, s.source))
+				s.Source, *s.FilePath, s.Lineno, s.Source))
 		}
 	}()
 
@@ -203,25 +220,25 @@ func encode(s *Stmt) *Instruction {
 		s: s,
 	}
 
-	if s.keySymbol == "" {
+	if s.KeySymbol == "" {
 		// No instruction
-		instr.isLenDecided = true
+		instr.IsLenDecided = true
 		return instr
 	}
 
 	var srcOp, trgtOp Operand
-	switch len(s.operands) {
+	switch len(s.Operands) {
 	case 0:
 		// No operands. "ret", "leave" etc.
 	case 1:
-		trgtOp = s.operands[0]
+		trgtOp = s.Operands[0]
 	case 2:
-		srcOp, trgtOp = s.operands[0], s.operands[1]
+		srcOp, trgtOp = s.Operands[0], s.Operands[1]
 	default:
 		panic("too many operands")
 	}
 
-	switch s.keySymbol {
+	switch s.KeySymbol {
 	case ".text":
 	case ".global":
 	case "nop":
@@ -233,52 +250,52 @@ func encode(s *Stmt) *Instruction {
 	case "leave":
 		code = []byte{0xc9}
 	case "jmp": // JMP rel8 or rel32s
-		trgtSymbol := trgtOp.(*symbolExpr).name
+		trgtSymbol := trgtOp.(*SymbolExpr).Name
 		varcode := &variableCode{
-			trgtSymbol: trgtSymbol,
+			TrgtSymbol: trgtSymbol,
 			// JMP rel8: EB cb
-			rel8Code:   []byte{0xeb, 0},
-			rel8Offset: 1,
+			Rel8Code:   []byte{0xeb, 0},
+			Rel8Offset: 1,
 			// JMP rel32: E9 cd
-			rel32Code:   []byte{0xe9, 0, 0, 0, 0},
-			rel32Offset: 1,
+			Rel32Code:   []byte{0xe9, 0, 0, 0, 0},
+			Rel32Offset: 1,
 		}
-		instr.varcode = varcode
+		instr.Varcode = varcode
 	case "je": // JE rel8 or rel32
-		trgtSymbol := trgtOp.(*symbolExpr).name
+		trgtSymbol := trgtOp.(*SymbolExpr).Name
 		varcode := &variableCode{
-			trgtSymbol: trgtSymbol,
+			TrgtSymbol: trgtSymbol,
 			// JE rel8: 74 cb
-			rel8Code:   []byte{0x74, 0},
-			rel8Offset: 1,
+			Rel8Code:   []byte{0x74, 0},
+			Rel8Offset: 1,
 			// JE rel32: 0F 84 cd
-			rel32Code:   []byte{0x0f, 0x84, 0, 0, 0, 0},
-			rel32Offset: 2,
+			Rel32Code:   []byte{0x0f, 0x84, 0, 0, 0, 0},
+			Rel32Offset: 2,
 		}
-		instr.varcode = varcode
+		instr.Varcode = varcode
 	case "jne":
-		trgtSymbol := trgtOp.(*symbolExpr).name
+		trgtSymbol := trgtOp.(*SymbolExpr).Name
 		varcode := &variableCode{
-			trgtSymbol: trgtSymbol,
+			TrgtSymbol: trgtSymbol,
 			// JNE rel8: 75 cb
-			rel8Code:   []byte{0x75, 0},
-			rel8Offset: 1,
+			Rel8Code:   []byte{0x75, 0},
+			Rel8Offset: 1,
 			// JE rel32: 0F 85 cd
-			rel32Code:   []byte{0x0f, 0x85, 0, 0, 0, 0},
-			rel32Offset: 2,
+			Rel32Code:   []byte{0x0f, 0x85, 0, 0, 0, 0},
+			Rel32Offset: 2,
 		}
-		instr.varcode = varcode
+		instr.Varcode = varcode
 	case "callq", "call":
-		trgtSymbol := trgtOp.(*symbolExpr).name
+		trgtSymbol := trgtOp.(*SymbolExpr).Name
 		// call rel16
 		code = []byte{0xe8, 0, 0, 0, 0}
-		ru := &relaTextUser{
-			instr:  instr,
-			offset: 1,
-			uses:   trgtSymbol,
-			toJump: true,
+		ru := &RelaTextUser{
+			Instr:  instr,
+			Offset: 1,
+			Uses:   trgtSymbol,
+			ToJump: true,
 		}
-		relaTextUsers = append(relaTextUsers, ru)
+		RelaTextUsers = append(RelaTextUsers, ru)
 		registerCallTarget(instr, trgtSymbol, 1, 4)
 	case "leaq":
 		switch src := srcOp.(type) {
@@ -292,15 +309,15 @@ func encode(s *Stmt) *Instruction {
 				modRM := composeModRM(mod, trgtRegi.toBits(), RM_RIP_RELATIVE)
 				code = []byte{REX_W, opcode, modRM}
 
-				symbol := src.expr.(*symbolExpr).name
-				ru := &relaTextUser{
-					instr:  instr,
-					offset: uintptr(len(code)),
-					uses:   symbol,
+				symbol := src.expr.(*SymbolExpr).Name
+				ru := &RelaTextUser{
+					Instr:  instr,
+					Offset: uintptr(len(code)),
+					Uses:   symbol,
 				}
 
 				code = append(code, 0, 0, 0, 0)
-				relaTextUsers = append(relaTextUsers, ru)
+				RelaTextUsers = append(RelaTextUsers, ru)
 			} else {
 				num := src.expr.(*numberLit).val
 				displacement, err := strconv.ParseInt(num, 0, 32)
@@ -315,7 +332,7 @@ func encode(s *Stmt) *Instruction {
 					rm = regi.toBits()
 					reg = trgtRegi.toBits()
 					modRM = composeModRM(mod, reg, rm)
-				} else if isInInt8Range(int(displacement)) {
+				} else if IsInInt8Range(int(displacement)) {
 					mod := ModIndirectionWithDisplacement8
 					rm = regi.toBits()
 					reg = trgtRegi.toBits()
@@ -339,7 +356,7 @@ func encode(s *Stmt) *Instruction {
 				code = append(code, displacementBytes...)
 			}
 		default:
-			panic(fmt.Sprintf("TBI: %T (%s)", srcOp, s.source))
+			panic(fmt.Sprintf("TBI: %T (%s)", srcOp, s.Source))
 		}
 	case "movb":
 		switch src := srcOp.(type) {
@@ -348,7 +365,7 @@ func encode(s *Stmt) *Instruction {
 			switch trgt := trgtOp.(type) {
 			case *indirection:
 				// movb %al,0(%rsi)
-				assert(evalNumExpr(trgt.expr) == 0, "expect offset 0")
+				Assert(evalNumExpr(trgt.expr) == 0, "expect offset 0")
 				mod := ModIndirectionWithNoDisplacement
 				reg := src.toBits()
 				rm := trgt.regi.toBits()
@@ -368,7 +385,7 @@ func encode(s *Stmt) *Instruction {
 			switch trgt := trgtOp.(type) {
 			case *indirection:
 				// movw %ax,0(%rsi)
-				assert(evalNumExpr(trgt.expr) == 0, "expect offset 0")
+				Assert(evalNumExpr(trgt.expr) == 0, "expect offset 0")
 				mod := ModIndirectionWithNoDisplacement
 				reg := src.toBits()
 				rm := trgt.regi.toBits()
@@ -430,21 +447,21 @@ func encode(s *Stmt) *Instruction {
 						modRM := composeModRM(mod, reg, RM_RIP_RELATIVE)
 						code = []byte{REX_W, opcode, modRM}
 
-						symbol := expr.left.(*symbolExpr).name
+						symbol := expr.left.(*SymbolExpr).Name
 						//if _, defined := definedSymbols[symbol]; !defined {
 						// @TODO shouud use expr.right.(*numberExpr).val as an offset
-						ru := &relaTextUser{
-							instr:  instr,
-							offset: uintptr(len(code)),
-							uses:   symbol,
-							adjust: int64(evalNumExpr(expr.right)),
+						ru := &RelaTextUser{
+							Instr:  instr,
+							Offset: uintptr(len(code)),
+							Uses:   symbol,
+							Adjust: int64(evalNumExpr(expr.right)),
 						}
-						relaTextUsers = append(relaTextUsers, ru)
+						RelaTextUsers = append(RelaTextUsers, ru)
 						//}
 						code = append(code, 0, 0, 0, 0)
 
 					default:
-						panic("TBI:" + string(s.source))
+						panic("TBI:" + string(s.Source))
 					}
 				} else {
 					// movq %rax, 32(%rsp)
@@ -487,16 +504,16 @@ func encode(s *Stmt) *Instruction {
 				modRM := composeModRM(mod, reg, RM_RIP_RELATIVE)
 				code = []byte{REX_W, opcode, modRM}
 
-				symbol := src.expr.(*symbolExpr).name
-				ru := &relaTextUser{
-					instr:  instr,
-					offset: uintptr(len(code)),
-					uses:   symbol,
+				symbol := src.expr.(*SymbolExpr).Name
+				ru := &RelaTextUser{
+					Instr:  instr,
+					Offset: uintptr(len(code)),
+					Uses:   symbol,
 				}
 
 				code = append(code, 0, 0, 0, 0)
 
-				relaTextUsers = append(relaTextUsers, ru)
+				RelaTextUsers = append(RelaTextUsers, ru)
 			} else if srcRegi.name == "rsp" {
 				var opcode uint8 = 0x8b
 				val := evalNumExpr(src.expr)
@@ -598,7 +615,7 @@ func encode(s *Stmt) *Instruction {
 				modRM := composeModRM(ModRegi, slash_0, rm)
 				imValue := evalNumExpr(src.expr)
 				switch {
-				case isInInt8Range(imValue):
+				case IsInInt8Range(imValue):
 					code = []byte{REX_W, 0x83, modRM, uint8(imValue)}
 				case imValue < 1<<31:
 					i32 := int32(imValue)
@@ -690,7 +707,7 @@ func encode(s *Stmt) *Instruction {
 			modRM := composeModRM(ModRegi, 7, rm)
 			code = []byte{REX_W, opcode, modRM, uint8(imValue)}
 		default:
-			panic("TBI:" + s.source)
+			panic("TBI:" + s.Source)
 		}
 	case "setl":
 		reg := trgtOp.(*register).toBits()
@@ -736,7 +753,7 @@ func encode(s *Stmt) *Instruction {
 				panic("TBI")
 			}
 		default:
-			panic("[encoder] TBI:" + s.source)
+			panic("[encoder] TBI:" + s.Source)
 		}
 	case "popq":
 		switch trgt := trgtOp.(type) {
@@ -744,7 +761,7 @@ func encode(s *Stmt) *Instruction {
 			// 58 +rd. POP r64.
 			code = []byte{0x58 + trgt.toBits()}
 		default:
-			panic("[encoder] TBI:" + s.source)
+			panic("[encoder] TBI:" + s.Source)
 		}
 	case "xor":
 		// XOR r/m64, imm8
@@ -756,38 +773,47 @@ func encode(s *Stmt) *Instruction {
 		code = []byte{REX_W, opcode, modRM, uint8(imValue)}
 	default:
 		panic(fmt.Sprintf("[encoder] TBI: %s at line %d\n\necho '%s' |./encode as",
-			s.source, 0, s.source))
+			s.Source, 0, s.Source))
 	}
 
-	instr.code = code
+	instr.Code = code
 
-	if instr.varcode != nil {
-		variableInstrs = append(variableInstrs, instr)
+	if instr.Varcode != nil {
+		VariableInstrs = append(VariableInstrs, instr)
 	} else {
-		instr.isLenDecided = true
+		instr.IsLenDecided = true
 	}
 	return instr
 }
 
-func encodeData(s *Stmt, dataAddr uintptr) []byte {
+type SymbolDefinition struct {
+	Name    string
+	Section string
+	Address uintptr
+	Instr   *Instruction
+}
+
+var DefinedSymbols = make(map[string]*SymbolDefinition)
+
+func EncodeData(s *Stmt, dataAddr uintptr) []byte {
 	defer func() {
 		if x := recover(); x != nil {
 			panic(fmt.Sprintf("%s\n[encoder] %s at %s:%d\n\necho '%s' |./encode as",
 				x,
-				s.source, *s.filePath, s.lineno, s.source))
+				s.Source, *s.FilePath, s.Lineno, s.Source))
 		}
 	}()
 
-	if s.labelSymbol != "" {
-		definedSymbols[s.labelSymbol].address = dataAddr
+	if s.LabelSymbol != "" {
+		DefinedSymbols[s.LabelSymbol].Address = dataAddr
 	}
-	if s.keySymbol == "" {
+	if s.KeySymbol == "" {
 		return nil
 	}
 
-	switch s.keySymbol {
+	switch s.KeySymbol {
 	case ".byte":
-		op := s.operands[0]
+		op := s.Operands[0]
 		switch opDtype := op.(type) {
 		case *numberLit:
 			rawVal := opDtype.val
@@ -802,7 +828,7 @@ func encodeData(s *Stmt, dataAddr uintptr) []byte {
 			return []uint8{rawVal}
 		}
 	case ".word":
-		op := s.operands[0]
+		op := s.Operands[0]
 		rawVal := op.(*numberLit).val
 		i, err := strconv.ParseInt(rawVal, 0, 16)
 		if err != nil {
@@ -811,7 +837,7 @@ func encodeData(s *Stmt, dataAddr uintptr) []byte {
 		buf := (*[2]byte)(unsafe.Pointer(&i))
 		return buf[:]
 	case ".quad":
-		op := s.operands[0]
+		op := s.Operands[0]
 		switch opDtype := op.(type) {
 		case *numberLit:
 			rawVal := opDtype.val
@@ -821,23 +847,29 @@ func encodeData(s *Stmt, dataAddr uintptr) []byte {
 			}
 			buf := (*[8]byte)(unsafe.Pointer(&i))
 			return buf[:]
-		case *symbolExpr:
-			ru := &relaDataUser{
-				addr: dataAddr,
-				uses: opDtype.name,
+		case *SymbolExpr:
+			ru := &RelaDataUser{
+				Addr: dataAddr,
+				Uses: opDtype.Name,
 			}
-			relaDataUsers = append(relaDataUsers, ru)
+			RelaDataUsers = append(RelaDataUsers, ru)
 			return make([]byte, 8)
 		default:
 			panic("Unexpected op.typ:")
 		}
 	case ".string":
-		op := s.operands[0]
+		op := s.Operands[0]
 		val := op.(*strLit).val
 		bytes := append([]byte(val), 0)
 		return bytes
 	default:
-		panic("TBI:" + s.keySymbol)
+		panic("TBI:" + s.KeySymbol)
 	}
 	return nil
+}
+
+func Assert(bol bool, errorMsg string) {
+	if !bol {
+		panic("assert failed: " + errorMsg)
+	}
 }
